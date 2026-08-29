@@ -577,8 +577,8 @@
       const m2 = mStr.charAt(1) || '0';
       const typeParam = clean(time_type) === 'arrival' ? '4' : '1';
       
-      // Yahoo乗換案内の仕様上、外部からURLで検索オプションを過剰に指定すると不整合が起きるため最小構成で生成
-      const url = `https://transit.yahoo.co.jp/search/result?from=${cFrom}&to=${cTo}&y=${cYear}&m=${cMonth}&d=${cDay}&h=${cHour}&m1=${m1}&m2=${m2}&type=${typeParam}`;
+      // Yahoo乗換案内の仕様上、外部からURLで検索オプションを過剰に指定すると不整合が起きるため最小構成で生成（時はhhパラメータ）
+      const url = `https://transit.yahoo.co.jp/search/result?from=${cFrom}&to=${cTo}&y=${cYear}&m=${cMonth}&d=${cDay}&hh=${cHour}&m1=${m1}&m2=${m2}&type=${typeParam}`;
       
       try {
         window.open(url, '_blank');
