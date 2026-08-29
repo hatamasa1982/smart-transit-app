@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -394,18 +394,36 @@
       document.getElementById('loading').style.display = 'block';
 
       const now = new Date();
-      const systemPrompt = `あなたは優秀な乗換案内アシスタントです。
-ユーザーの自然文入力を解析し、出発地、目的地、指定日時、出発/到着種別を判定してJSONのみを出力してください。
+      const currentYear = now.getFullYear();
+      const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+      const currentDate = String(now.getDate()).padStart(2, '0');
+      const currentHour = String(now.getHours()).padStart(2, '0');
+      const currentMinute = String(now.getMinutes()).padStart(2, '0');
 
-現在日時: ${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 ${now.getHours()}時${now.getMinutes()}分
+      const systemPrompt = `あなたは優秀な乗換案内アシスタントです。
+ユーザーの自然文入力を解析し、出発地、目的地、指定日時、出発/到着種別を正確に判定してJSONのみを出力してください。
+
+現在日時: ${currentYear}年${currentMonth}月${currentDate}日 ${currentHour}時${currentMinute}分
 ユーザーの拠点エリア: ${homeArea}
 
-【重要：同名駅・駅名の補正ルール】
-1. 「学園前」「白石」「府中」など全国に同名駅が存在する場合：
-   - 出発地または目的地の片方が判明している場合は、その駅と同一または近接エリアの駅を優先してください。
-   - エリアの手がかりがない場合は、ユーザーの拠点エリア（${homeArea}）の駅を最優先してください。
-   - Yahoo!乗換案内で確実にヒットする正式な駅名表記（例: 学園前(北海道)、白石(北海道)、府中(東京都) など）を出力してください。
-2. 路線名や不要な修飾（「札幌市営地下鉄」「JR線」「〜駅」など）は取り除き、Yahoo!乗換案内で正しく検索できる駅名にしてください。
+【重要：日時・発着種別の判定ルール】
+1. 発着種別 (time_type) の判定:
+   - 到着指定 ("arrival"): 「〜着」「〜到着」「〜までに」「〜着く」「〜に着きたい」「〜着希望」などの表現がある場合
+   - 出発指定 ("departure"): 「〜発」「〜出発」「〜に出る」「〜から向かう」など、または発着の明示がない場合
+
+2. 日時・時刻の補完ルール:
+   - 「明日」「明後日」「来週◯曜日」などの相対表現は、現在日時(${currentYear}/${currentMonth}/${currentDate})を基準にして正確な年月日を計算してください。
+   - 日付が指定されていない場合は、現在日付(${currentYear}年${currentMonth}月${currentDate}日)を設定してください。
+   - 「14時」「14:30」「午後2時」「夕方5時」などの時刻表現は、24時間表記の数値文字列（year: "YYYY", month: "MM", day: "DD", hour: "HH", minute: "MM"）に変換してください（1桁は2桁0埋め）。
+   - 分が省略されている場合（例:「14時発」「14時着」）は minute: "00" としてください。
+   - 時刻自体が全く指定されていない場合は、現在日時の hour, minute を設定してください。
+
+3. 同名駅・駅名の補正ルール:
+   - 「学園前」「白石」「府中」など全国に同名駅が存在する場合：
+     - 出発地または目的地の片方が判明している場合は、その駅と同一または近接エリアの駅を優先してください。
+     - 手がかりがない場合は拠点エリア（${homeArea}）の駅を最優先してください。
+     - Yahoo!乗換案内で確実にヒットする正式な駅名表記（例: 学園前(北海道)、白石(北海道) など）にしてください。
+   - 「駅」「JR」「札幌市営地下鉄」などの不要な修飾は削除してください。
 
 【出力JSONフォーマット】
 {
@@ -419,10 +437,13 @@
   "time_type": "departure" または "arrival"
 }
 
-【判定ルール】
-- 「〜着」「〜到着」「〜までに」「〜着く」は time_type: "arrival"
-- それ以外は time_type: "departure"
-- 出力は純粋なJSON文字列のみとし、マークダウン記法は含めないでください。`;
+【入力例と解析結果】
+- 「明日の朝9時着で札幌から新千歳空港」
+  -> {"from":"札幌","to":"新千歳空港","year":"${currentYear}","month":"...","day":"...","hour":"09","minute":"00","time_type":"arrival"}
+- 「17:30発 月寒中央から大通」
+  -> {"from":"月寒中央","to":"大通","year":"${currentYear}","month":"${currentMonth}","day":"${currentDate}","hour":"17","minute":"30","time_type":"departure"}
+
+出力は純粋なJSON文字列のみとし、マークダウン記法は含めないでください。`;
 
       try {
         const models = await getUsableModels(apiKey);
@@ -505,8 +526,10 @@
       const m1 = mStr.charAt(0);
       const m2 = mStr.charAt(1);
       
-      const typeParam = (time_type === 'arrival') ? '4' : '1';
-      const url = `https://transit.yahoo.co.jp/search/result?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&y=${year}&m=${String(month).padStart(2, '0')}&d=${String(day).padStart(2, '0')}&hh=${String(hour).padStart(2, '0')}&m1=${m1}&m2=${m2}&type=${typeParam}`;
+      // Yahoo乗換案内の仕様上、外部からURLで「指定席優先(expkind)」や「交通手段(exなど)」を指定すると、
+      // 内部の経路探索アルゴリズムが不整合を起こし、全車指定席特急が除外されるなどの深刻なバグを引き起こすことが判明しました。
+      // したがって、検索オプションは一切付与せず、Yahooの標準デフォルトエンジンにすべて任せるのが最も確実です。
+      const url = `https://transit.yahoo.co.jp/search/result?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&y=${year}&m=${String(month).padStart(2, '0')}&d=${String(day).padStart(2, '0')}&h=${String(hour).padStart(2, '0')}&m1=${m1}&m2=${m2}&type=${typeParam}`;
       
       window.open(url, '_blank');
     }
