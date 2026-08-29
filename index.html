@@ -307,7 +307,7 @@
       </div>
 
       <div class="app-footer">
-        v1.2.0 (2026/08/30 08:05 更新)
+        v1.3.0 (2026/08/30 08:08 更新)
       </div>
 
     </div>
@@ -556,10 +556,10 @@
       const mStr = clean(minute).padStart(2, '0');
       const m1 = mStr.charAt(0) || '0';
       const m2 = mStr.charAt(1) || '0';
-      // ジョルダン: Cway (0: 出発, 1: 到着)
+      // ジョルダン: Cway (0: 出発, 1: 到着), S=検索 で直接結果画面へ遷移
       const cway = clean(time_type) === 'arrival' ? '1' : '0';
       
-      const url = `https://www.jorudan.co.jp/norikae/cgi/nori.cgi?eki1=${cFrom}&eki2=${cTo}&Dyy=${cYear}&Dmm=${cMonth}&Ddd=${cDay}&Dhh=${cHour}&Dmn1=${m1}&Dmn2=${m2}&Cway=${cway}`;
+      const url = `https://www.jorudan.co.jp/norikae/cgi/nori.cgi?eki1=${cFrom}&eki2=${cTo}&Dyy=${cYear}&Dmm=${cMonth}&Ddd=${cDay}&Dhh=${cHour}&Dmn1=${m1}&Dmn2=${m2}&Cway=${cway}&S=%E6%A4%9C%E7%B4%A2`;
       
       try {
         window.open(url, '_blank');
