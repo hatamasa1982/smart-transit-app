@@ -16,6 +16,7 @@
       --card-bg: #FFFFFF;
       --border-color: #E0DCD3;
       --yahoo-color: #FF0033;
+      --jorudan-color: #E85217;
       --google-color: #4285F4;
     }
 
@@ -126,6 +127,13 @@
       background-color: white;
       color: var(--yahoo-color);
       border: 2px solid var(--yahoo-color);
+      margin-bottom: 10px;
+    }
+
+    .btn-jorudan {
+      background-color: white;
+      color: var(--jorudan-color);
+      border: 2px solid var(--jorudan-color);
       margin-bottom: 10px;
     }
 
@@ -284,6 +292,7 @@
       <div id="result-screen">
         <div class="result-info" id="result-info"></div>
         
+        <button class="btn btn-jorudan" id="btn-jorudan" onclick="openJorudan()">🚆 ジョルダン乗換案内で見る</button>
         <button class="btn btn-yahoo" id="btn-yahoo" onclick="openYahoo()">🚃 Yahoo!乗換案内で見る</button>
         <button class="btn btn-google" id="btn-google" onclick="openGoogleMaps()">🗺️ Googleマップで見る</button>
         
@@ -518,20 +527,64 @@
       }
     }
 
+    function openJorudan() {
+      if (!transitData) return;
+      
+      const { from, to, year, month, day, hour, minute, time_type } = transitData;
+      
+      // 空白・改行・不要な文字を除去して安全にフォーマット
+      const clean = (val) => String(val || '').trim().replace(/[\r\n\s]/g, '');
+      
+      const cFrom = encodeURIComponent(clean(from));
+      const cTo = encodeURIComponent(clean(to));
+      const cYear = clean(year);
+      const cMonth = clean(month).padStart(2, '0');
+      const cDay = clean(day).padStart(2, '0');
+      const cHour = clean(hour).padStart(2, '0');
+      
+      const mStr = clean(minute).padStart(2, '0');
+      const m1 = mStr.charAt(0) || '0';
+      const m2 = mStr.charAt(1) || '0';
+      // ジョルダン: Cway (0: 出発, 1: 到着)
+      const cway = clean(time_type) === 'arrival' ? '1' : '0';
+      
+      const url = `https://www.jorudan.co.jp/norikae/cgi/nori.cgi?eki1=${cFrom}&eki2=${cTo}&Dyy=${cYear}&Dmm=${cMonth}&Ddd=${cDay}&Dhh=${cHour}&Dmn1=${m1}&Dmn2=${m2}&Cway=${cway}`;
+      
+      try {
+        window.open(url, '_blank');
+      } catch (err) {
+        alert('リンクを開けませんでした: ' + err.message);
+      }
+    }
+
     function openYahoo() {
       if (!transitData) return;
       
       const { from, to, year, month, day, hour, minute, time_type } = transitData;
-      const mStr = String(minute || '00').padStart(2, '0');
-      const m1 = mStr.charAt(0);
-      const m2 = mStr.charAt(1);
       
-      // Yahoo乗換案内の仕様上、外部からURLで「指定席優先(expkind)」や「交通手段(exなど)」を指定すると、
-      // 内部の経路探索アルゴリズムが不整合を起こし、全車指定席特急が除外されるなどの深刻なバグを引き起こすことが判明しました。
-      // したがって、検索オプションは一切付与せず、Yahooの標準デフォルトエンジンにすべて任せるのが最も確実です。
-      const url = `https://transit.yahoo.co.jp/search/result?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&y=${year}&m=${String(month).padStart(2, '0')}&d=${String(day).padStart(2, '0')}&h=${String(hour).padStart(2, '0')}&m1=${m1}&m2=${m2}&type=${typeParam}`;
+      // 空白・改行・不要な文字を除去して安全にフォーマット
+      const clean = (val) => String(val || '').trim().replace(/[\r\n\s]/g, '');
       
-      window.open(url, '_blank');
+      const cFrom = encodeURIComponent(clean(from));
+      const cTo = encodeURIComponent(clean(to));
+      const cYear = clean(year);
+      const cMonth = clean(month).padStart(2, '0');
+      const cDay = clean(day).padStart(2, '0');
+      const cHour = clean(hour).padStart(2, '0');
+      
+      const mStr = clean(minute).padStart(2, '0');
+      const m1 = mStr.charAt(0) || '0';
+      const m2 = mStr.charAt(1) || '0';
+      const typeParam = clean(time_type) === 'arrival' ? '4' : '1';
+      
+      // Yahoo乗換案内の仕様上、外部からURLで検索オプションを過剰に指定すると不整合が起きるため最小構成で生成
+      const url = `https://transit.yahoo.co.jp/search/result?from=${cFrom}&to=${cTo}&y=${cYear}&m=${cMonth}&d=${cDay}&h=${cHour}&m1=${m1}&m2=${m2}&type=${typeParam}`;
+      
+      try {
+        window.open(url, '_blank');
+      } catch (err) {
+        alert('リンクを開けませんでした: ' + err.message);
+      }
     }
 
     function openGoogleMaps() {
